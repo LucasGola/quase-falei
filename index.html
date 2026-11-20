@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14121a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Quase Falei</title>
+<style>
+:root{
+  --bg:#14121a; --panel:#1f1c28; --panel2:#2a2636; --text:#f4f2f8; --muted:#a39fb2;
+  --ok:#2fbf71; --bad:#e5484d; --skip:#8b8799; --radius:18px;
+  --t0:#3b82f6; --t1:#ef4444;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+body{display:flex;justify-content:center;overflow-x:hidden}
+/* durante a rodada a página não rola: a carta saindo da tela não pode criar barra de rolagem */
+html.lock,html.lock body{overflow:hidden;height:100%}
+html.lock #app{height:100%;height:100dvh;overflow:hidden}
+#app{width:100%;max-width:520px;min-height:100%;padding:16px;padding-top:max(16px,env(safe-area-inset-top));
+  padding-bottom:max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column;gap:14px}
+.screen.on{display:flex}
+h1{font-size:28px;margin:4px 0 0;letter-spacing:-.5px}
+h2{font-size:20px;margin:0}
+.muted{color:var(--muted);font-size:14px}
+.box{background:var(--panel);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px}
+label{font-size:13px;color:var(--muted)}
+input,textarea,select{width:100%;background:var(--panel2);color:var(--text);border:1px solid transparent;
+  border-radius:12px;padding:12px;font-size:16px;font-family:inherit}
+input:focus,textarea:focus{outline:none;border-color:#6d64ff}
+textarea{resize:vertical;min-height:44px}
+.row{display:flex;gap:10px;align-items:center}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer}
+.sw.sel{border-color:#fff}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:10px 14px;border-radius:999px;background:var(--panel2);cursor:pointer;font-size:15px;user-select:none}
+.chip.sel{background:#6d64ff;color:#fff}
+button{font-family:inherit;font-size:17px;font-weight:600;border:0;border-radius:14px;padding:15px;
+  background:#6d64ff;color:#fff;cursor:pointer}
+button.ghost{background:var(--panel2);color:var(--text)}
+button.danger{background:transparent;color:var(--bad);font-weight:500}
+button:disabled{opacity:.4}
+.spacer{flex:1}
+/* placar */
+.score{display:flex;gap:10px}
+.score .t{flex:1;border-radius:14px;padding:10px 12px;background:var(--panel);border-left:6px solid var(--c)}
+.score .t.turn{background:var(--panel2);box-shadow:0 0 0 2px var(--c) inset}
+.score .n{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score .p{font-size:28px;font-weight:800}
+/* jogo */
+#play{gap:10px;user-select:none;-webkit-user-select:none}
+.topbar{display:flex;align-items:center;justify-content:space-between}
+#timer{font-size:44px;font-weight:800;font-variant-numeric:tabular-nums}
+#timer.low{color:var(--bad)}
+.iconbtn{background:var(--panel2);padding:10px 14px;font-size:15px;border-radius:12px}
+#stage{position:relative;flex:1;min-height:300px;display:flex;align-items:center;justify-content:center;touch-action:none}
+.card{position:absolute;width:88%;max-width:380px;background:#fff;color:#1a1724;border-radius:22px;
+  box-shadow:0 18px 50px rgba(0,0,0,.45);overflow:hidden;will-change:transform;touch-action:none}
+.card .head{background:var(--tc);color:#fff;padding:22px 18px;text-align:center}
+.card .head small{display:block;font-size:12px;opacity:.85;letter-spacing:1px;text-transform:uppercase}
+.card .title{font-size:30px;font-weight:800;line-height:1.1;margin-top:4px;word-break:break-word}
+.card ul{list-style:none;margin:0;padding:12px 18px 18px}
+.card li{font-size:21px;font-weight:600;color:#b4233a;padding:9px 0;text-align:center;border-bottom:1px solid #eee}
+.card li:last-child{border-bottom:0}
+.stamp{position:absolute;top:18px;padding:6px 12px;border:3px solid;border-radius:10px;font-weight:800;
+  font-size:20px;opacity:0;transform:rotate(-12deg);background:rgba(255,255,255,.9)}
+.stamp.ok{left:14px;color:var(--ok)} .stamp.bad{right:14px;color:var(--bad);transform:rotate(12deg)}
+.stamp.sk{left:50%;transform:translateX(-50%);color:var(--skip)}
+.hints{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hints button{font-size:14px;padding:12px 6px;line-height:1.2}
+.hints .bad{background:var(--bad)} .hints .ok{background:var(--ok)} .hints .sk{background:var(--panel2)}
+.small{font-size:13px;color:var(--muted);text-align:center}
+#flash{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .25s}
+.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+/* listas */
+.log{display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow:auto}
+.log div{display:flex;justify-content:space-between;background:var(--panel2);padding:9px 12px;border-radius:10px;font-size:15px}
+.big{font-size:56px;font-weight:900;text-align:center;margin:0}
+.center{text-align:center}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px;z-index:10}
+#modal.on{display:flex}
+#modal .box{width:100%;max-width:360px;gap:14px}
+#modal p{margin:0;font-size:18px}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#000;color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- CONFIGURAÇÃO -->
+<section class="screen" id="setup">
+  <h1>Quase Falei</h1>
+  <div class="muted" id="deckInfo"></div>
+  <div id="resumeBox" class="box" style="display:none">
+    <div>Há uma sessão em andamento.</div>
+    <button id="resumeBtn">Continuar sessão</button>
+  </div>
+  <div class="box" id="teamBox0"></div>
+  <div class="box" id="teamBox1"></div>
+  <div class="box">
+    <label>Tempo por rodada</label>
+    <div class="chips" id="timeChips"></div>
+    <label>Rodadas por time</label>
+    <div class="chips" id="roundChips"></div>
+  </div>
+  <button id="startBtn">Começar</button>
+</section>
+
+<!-- VEZ DO TIME -->
+<section class="screen" id="ready">
+  <div class="score" id="scoreR"></div>
+  <div class="spacer"></div>
+  <div class="center muted" id="readyRound"></div>
+  <p class="big" id="readyTeam"></p>
+  <div class="center" id="readyPlayer" style="font-size:20px"></div>
+  <div class="box" style="margin-top:10px">
+    <div><b style="color:var(--ok)">Arraste → direita</b>: acertou, +1 para o time da vez</div>
+    <div><b style="color:var(--bad)">Arraste ← esquerda</b>: falou palavra proibida, +1 para o adversário</div>
+    <div><b>Arraste ↑ ou ↓</b>: pular (1 por rodada, a carta volta ao baralho)</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="goBtn">Valendo!</button>
+  <button class="danger" id="endBtn1">Encerrar sessão</button>
+</section>
+
+<!-- JOGANDO -->
+<section class="screen" id="play">
+  <div class="topbar">
+    <button class="iconbtn" id="pauseBtn">Pausar</button>
+    <div id="timer">0:00</div>
+    <button class="iconbtn" id="undoBtn">Desfazer</button>
+  </div>
+  <div class="score" id="scoreP"></div>
+  <div id="stage"></div>
+  <div class="small" id="skipInfo"></div>
+  <div class="hints">
+    <button class="bad" data-act="foul">← Falta</button>
+    <button class="sk" data-act="skip">Pular</button>
+    <button class="ok" data-act="hit">Acerto →</button>
+  </div>
+</section>
+
+<!-- PAUSA -->
+<section class="screen" id="paused">
+  <div class="spacer"></div>
+  <p class="big">Pausado</p>
+  <div class="spacer"></div>
+  <button id="resumePlay">Continuar</button>
+  <button class="ghost" id="endRoundBtn">Terminar rodada agora</button>
+  <button class="danger" id="endBtn2">Encerrar sessão</button>
+</section>
+
+<!-- FIM DA RODADA -->
+<section class="screen" id="roundEnd">
+  <h2 id="reTitle"></h2>
+  <div class="score" id="scoreE"></div>
+  <div class="muted" id="reSummary"></div>
+  <div class="log" id="reLog"></div>
+  <div class="spacer"></div>
+  <button id="nextBtn">Próxima rodada</button>
+  <button class="danger" id="endBtn3">Encerrar sessão</button>
+</section>
+
+<!-- RESULTADO -->
+<section class="screen" id="final">
+  <div class="spacer"></div>
+  <div class="center muted">Resultado</div>
+  <p class="big" id="winner"></p>
+  <div class="score" id="scoreF"></div>
+  <div class="center muted" id="finalInfo"></div>
+  <div class="spacer"></div>
+  <button id="newBtn">Nova sessão</button>
+</section>
+
+</div>
+<div id="flash"></div>
+<div class="toast" id="toast"></div>
+<div id="modal"><div class="box">
+  <p id="modalMsg"></p>
+  <button id="modalYes"></button>
+  <button class="ghost" id="modalNo">Cancelar</button>
+</div></div>
+
+<script>
+/* ============ CARTAS ============
+   Formato: [título, proibida1, ..., proibida5]
+   Não edite à mão: altere a planilha e rode  python atualizar_cartas.py */
+/*CARTAS-INICIO*/
+const CARDS = [
+  ["Praia", "Mar", "Areia", "Sol", "Ondas", "Verão"],
+  ["Chocolate", "Cacau", "Doce", "Sobremesa", "Barra", "Leite"],
+  ["Avião", "Voar", "Aeroporto", "Piloto", "Asas", "Viagem"],
+  ["Biblioteca", "Livro", "Leitura", "Estante", "Silêncio", "Empréstimo"],
+  ["Casamento", "Noiva", "Noivo", "Aliança", "Festa", "Cerimônia"],
+  ["Futebol", "Bola", "Gol", "Campo", "Jogador", "Time"],
+  ["Cachorro", "Cão", "Latido", "Rabo", "Passeio", "Coleira"],
+  ["Café", "Bebida", "Xícara", "Cafeína", "Coador", "Manhã"],
+  ["Bicicleta", "Pedal", "Roda", "Guidão", "Capacete", "Ciclista"],
+  ["Abelha", "Mel", "Colmeia", "Ferrão", "Enxame", "Flor"],
+  ["Astronauta", "Espaço", "Foguete", "Planeta", "Lua", "Traje"],
+  ["Cinema", "Filme", "Pipoca", "Tela", "Ingresso", "Sessão"],
+  ["Dentista", "Dente", "Consultório", "Aparelho", "Cárie", "Escova"],
+  ["Girafa", "Pescoço", "Manchas", "Savana", "Alta", "Zoológico"],
+  ["Chave", "Fechadura", "Abrir", "Porta", "Metal", "Cadeado"],
+  ["Piano", "Teclas", "Música", "Instrumento", "Pedal", "Pianista"],
+  ["Sorvete", "Gelado", "Casquinha", "Verão", "Sobremesa", "Sabor"],
+  ["Semáforo", "Trânsito", "Vermelho", "Amarelo", "Verde", "Cruzamento"],
+  ["Detetive", "Mistério", "Investigação", "Pista", "Crime", "Lupa"],
+  ["Relógio", "Horas", "Ponteiro", "Pulso", "Tempo", "Despertador"],
+  ["Canguru", "Austrália", "Bolsa", "Pulo", "Marsupial", "Filhote"],
+  ["Pipoca", "Milho", "Cinema", "Panela", "Manteiga", "Estourar"],
+  ["Vulcão", "Lava", "Erupção", "Magma", "Montanha", "Fumaça"],
+  ["Espelho", "Reflexo", "Imagem", "Banheiro", "Vidro", "Aparência"],
+  ["Pinguim", "Gelo", "Antártida", "Ave", "Preto e branco", "Nadar"],
+  ["Hambúrguer", "Pão", "Carne", "Queijo", "Lanche", "Batata frita"],
+  ["Paraquedas", "Salto", "Avião", "Queda", "Vento", "Tecido"],
+  ["Bússola", "Norte", "Direção", "Mapa", "Agulha", "Navegação"],
+  ["Chuveiro", "Banho", "Água", "Box", "Registro", "Temperatura"],
+  ["Coração", "Batimento", "Sangue", "Órgão", "Amor", "Peito"],
+  ["Mochila", "Escola", "Costas", "Zíper", "Caderno", "Alça"],
+  ["Caranguejo", "Praia", "Pinças", "Crustáceo", "Areia", "Andar de lado"],
+  ["Foguete", "Espaço", "Astronauta", "Lançamento", "Combustível", "Decolar"],
+  ["Panela de pressão", "Cozinha", "Feijão", "Vapor", "Tampa", "Apito"],
+  ["Arco-íris", "Cores", "Chuva", "Céu", "Arco", "Pote de ouro"],
+  ["Tubarão", "Mar", "Peixe", "Nadadeira", "Dentes", "Predador"],
+  ["Pente", "Cabelo", "Desembaraçar", "Dentes", "Escova", "Penteado"],
+  ["Elevador", "Prédio", "Andar", "Botão", "Subir", "Descer"],
+  ["Lâmpada", "Luz", "Energia", "Acender", "Ideia", "Eletricidade"],
+  ["Panda", "Urso", "Bambu", "China", "Preto e branco", "Animal"],
+  ["Mala", "Viagem", "Roupas", "Aeroporto", "Bagagem", "Rodinhas"],
+  ["Ponte", "Rio", "Atravessar", "Estrada", "Estrutura", "Pedestre"],
+  ["Violino", "Arco", "Cordas", "Música", "Instrumento", "Orquestra"],
+  ["Geladeira", "Frio", "Cozinha", "Alimento", "Freezer", "Porta"],
+  ["Guarda-chuva", "Chuva", "Molhado", "Abrir", "Tempestade", "Cabo"],
+  ["Cacto", "Espinho", "Deserto", "Planta", "Suculenta", "Vaso"],
+  ["Bibliotecário", "Livro", "Biblioteca", "Empréstimo", "Estante", "Catalogar"],
+  ["Bombeiro", "Incêndio", "Mangueira", "Resgate", "Uniforme", "Caminhão"],
+  ["Chef de cozinha", "Restaurante", "Receita", "Cozinheiro", "Prato", "Gastronomia"],
+  ["Fotógrafo", "Câmera", "Foto", "Lente", "Ensaio", "Imagem"],
+  ["Arquiteto", "Projeto", "Prédio", "Planta", "Construção", "Desenho"],
+  ["Veterinário", "Animal", "Consulta", "Cachorro", "Gato", "Clínica"],
+  ["Professor", "Aluno", "Escola", "Aula", "Ensinar", "Quadro"],
+  ["Piloto", "Avião", "Cabine", "Voo", "Comandante", "Aeroporto"],
+  ["Jardineiro", "Planta", "Jardim", "Poda", "Regador", "Profissão"],
+  ["Detetive particular", "Investigação", "Pista", "Cliente", "Mistério", "Observar"],
+  ["Padeiro", "Pão", "Forno", "Massa", "Padaria", "Fermento"],
+  ["Astrônomo", "Estrelas", "Planetas", "Telescópio", "Espaço", "Ciência"],
+  ["Mecânico", "Motor", "Carro", "Oficina", "Conserto", "Ferramenta"],
+  ["Maquiador", "Pincel", "Rosto", "Beleza", "Maquiagem", "Produção"],
+  ["Pescador", "Peixe", "Vara", "Anzol", "Rio", "Barco"],
+  ["Cabeleireiro", "Cabelo", "Corte", "Salão", "Escova", "Tesoura"],
+  ["Programador", "Código", "Computador", "Software", "Linguagem", "Tecnologia"],
+  ["Jornalista", "Notícia", "Reportagem", "Entrevista", "Jornal", "Imprensa"],
+  ["Palhaço", "Circo", "Nariz", "Piada", "Maquiagem", "Alegria"],
+  ["Mágico", "Truque", "Ilusão", "Cartola", "Coelho", "Varinha"],
+  ["Bailarina", "Balé", "Dança", "Sapatilha", "Palco", "Tutu"],
+  ["Surfista", "Prancha", "Onda", "Mar", "Praia", "Equilíbrio"],
+  ["Goleiro", "Futebol", "Defesa", "Luvas", "Gol", "Trave"],
+  ["Juiz", "Tribunal", "Sentença", "Toga", "Processo", "Justiça"],
+  ["Advogado", "Lei", "Cliente", "Tribunal", "Defesa", "Processo"],
+  ["Cientista", "Experimento", "Laboratório", "Pesquisa", "Descoberta", "Ciência"],
+  ["Pintor", "Tinta", "Parede", "Pincel", "Quadro", "Artista"],
+  ["Costureira", "Agulha", "Linha", "Tecido", "Máquina", "Roupa"],
+  ["Eletricista", "Fio", "Energia", "Tomada", "Instalação", "Choque"],
+  ["Encanador", "Cano", "Vazamento", "Torneira", "Água", "Reparo"],
+  ["Garçom", "Restaurante", "Bandeja", "Pedido", "Mesa", "Cardápio"],
+  ["Carteiro", "Carta", "Entrega", "Correio", "Encomenda", "Uniforme"],
+  ["Motorista", "Volante", "Carro", "Dirigir", "Trânsito", "Passageiro"],
+  ["Cantor", "Música", "Voz", "Palco", "Show", "Microfone"],
+  ["Ator", "Teatro", "Cinema", "Personagem", "Cena", "Roteiro"],
+  ["Influenciador digital", "Redes sociais", "Seguidores", "Conteúdo", "Publi", "Internet"],
+  ["DJ", "Música", "Festa", "Mixagem", "Toca-discos", "Pista"],
+  ["Roteirista", "História", "Diálogo", "Filme", "Personagem", "Roteiro"],
+  ["Dublador", "Voz", "Desenho", "Filme", "Microfone", "Personagem"],
+  ["Astronauta brasileiro", "Espaço", "Marcos Pontes", "Foguete", "Missão", "Estação"],
+  ["Batman", "Bruce Wayne", "Gotham", "Morcego", "Robin", "Coringa"],
+  ["Barbie", "Boneca", "Mattel", "Rosa", "Ken", "Brinquedo"],
+  ["Harry Potter", "Hogwarts", "Magia", "Hermione", "Voldemort", "Varinha"],
+  ["Homem-Aranha", "Peter Parker", "Teia", "Marvel", "Aranha", "Herói"],
+  ["Mickey Mouse", "Disney", "Minnie", "Orelhas", "Camundongo", "Parque"],
+  ["Elsa", "Frozen", "Gelo", "Anna", "Let It Go", "Princesa"],
+  ["Shrek", "Burro", "Fiona", "Ogro", "Pântano", "Conto de fadas"],
+  ["Darth Vader", "Star Wars", "Luke", "Sabre de luz", "Sith", "Máscara"],
+  ["Mario", "Nintendo", "Luigi", "Encanador", "Cogumelo", "Videogame"],
+  ["Sonic", "Ouriço", "Azul", "Velocidade", "Sega", "Anéis"],
+  ["Pikachu", "Pokémon", "Amarelo", "Raio", "Ash", "Criatura"],
+  ["Bob Esponja", "Fenda do Biquíni", "Patrick", "Abacaxi", "Hambúrguer de siri", "Desenho"],
+  ["Wandinha Addams", "Família Addams", "Escola", "Dança", "Gótica", "Jenna Ortega"],
+  ["Eleven", "Stranger Things", "Onze", "Poderes", "Hawkins", "Série"],
+  ["Simba", "O Rei Leão", "Mufasa", "Nala", "Timão", "Pumba"],
+  ["Moana", "Oceano", "Maui", "Disney", "Ilha", "Velejar"],
+  ["Woody", "Toy Story", "Buzz", "Cowboy", "Andy", "Xerife"],
+  ["Buzz Lightyear", "Toy Story", "Espaço", "Woody", "Ao infinito", "Patrulheiro"],
+  ["Goku", "Dragon Ball", "Saiyajin", "Kamehameha", "Vegeta", "Anime"],
+  ["Naruto", "Ninja", "Sasuke", "Konoha", "Raposa", "Anime"],
+  ["Luffy", "One Piece", "Pirata", "Chapéu de palha", "Borracha", "Zoro"],
+  ["Taylor Swift", "Cantora", "Eras Tour", "Álbum", "Pop", "Swifties"],
+  ["Beyoncé", "Cantora", "Queen B", "Destiny's Child", "Renaissance", "Palco"],
+  ["Anitta", "Cantora", "Brasil", "Funk", "Show das Poderosas", "Larissa"],
+  ["Lady Gaga", "Cantora", "Poker Face", "Joanne", "Figurino", "Pop"],
+  ["Ed Sheeran", "Cantor", "Guitarra", "Shape of You", "Ruivo", "Britânico"],
+  ["Ayrton Senna", "Fórmula 1", "Piloto", "Brasil", "McLaren", "Capacete"],
+  ["Pelé", "Futebol", "Camisa 10", "Santos", "Copa do Mundo", "Rei"],
+  ["Neymar", "Futebol", "Brasil", "Santos", "Camisa 10", "Atacante"],
+  ["Marta", "Futebol", "Seleção brasileira", "Camisa 10", "Futebol feminino", "Gols"],
+  ["Cristiano Ronaldo", "Futebol", "Portugal", "CR7", "Gol", "Al-Nassr"],
+  ["Lionel Messi", "Futebol", "Argentina", "Barcelona", "Camisa 10", "Copa"],
+  ["Rihanna", "Cantora", "Fenty", "Umbrella", "Barbados", "Maquiagem"],
+  ["Michael Jackson", "Pop", "Thriller", "Moonwalk", "Luva", "Jackson 5"],
+  ["Adele", "Cantora", "Hello", "Voz", "Álbum", "Britânica"],
+  ["Albert Einstein", "Física", "Relatividade", "Cabelo", "Gênio", "E=mc²"],
+  ["Frida Kahlo", "Pintora", "México", "Autorretrato", "Sobrancelhas", "Arte"],
+  ["Van Gogh", "Pintor", "Girassóis", "Orelha", "Noite Estrelada", "Arte"],
+  ["Sabrina Carpenter", "Cantora", "Espresso", "Pop", "Short n' Sweet", "Atriz"],
+  ["Bruno Mars", "Cantor", "Funk", "Uptown Funk", "Palco", "Havaiano"],
+  ["Zendaya", "Atriz", "Euphoria", "Duna", "Moda", "Spider-Man"],
+  ["Pedro Pascal", "Ator", "The Last of Us", "Mandalorian", "Chile", "Série"],
+  ["Netflix", "Streaming", "Série", "Filme", "Assinatura", "Tela"],
+  ["TikTok", "Vídeos", "Dança", "Algoritmo", "Trend", "Aplicativo"],
+  ["Instagram", "Fotos", "Stories", "Reels", "Seguidores", "Rede social"],
+  ["WhatsApp", "Mensagem", "Grupo", "Áudio", "Aplicativo", "Conversa"],
+  ["Spotify", "Música", "Playlist", "Streaming", "Podcast", "Ouvir"],
+  ["YouTube", "Vídeo", "Canal", "Inscrição", "Plataforma", "Criador"],
+  ["Nintendo Switch", "Console", "Portátil", "Joy-Con", "Mario", "Videogame"],
+  ["PlayStation", "Sony", "Console", "Controle", "Videogame", "Jogos"],
+  ["Minecraft", "Blocos", "Construir", "Creeper", "Steve", "Mineração"],
+  ["The Sims", "Simulação", "Avatar", "Casa", "Necessidades", "Construção"],
+  ["Fortnite", "Battle Royale", "Construção", "Skin", "Dança", "Ilha"],
+  ["Among Us", "Impostor", "Tripulante", "Nave", "Tarefa", "Votação"],
+  ["Big Brother Brasil", "Reality show", "Confinamento", "Paredão", "Votação", "Casa"],
+  ["MasterChef", "Culinária", "Competição", "Jurados", "Receita", "Cozinha"],
+  ["Round 6", "Série", "Jogos", "Boneca", "Coreia", "Sobrevivência"],
+  ["Stranger Things", "Eleven", "Hawkins", "Demogorgon", "Netflix", "Mundo Invertido"],
+  ["Game of Thrones", "Dragões", "Westeros", "Trono", "Stark", "Série"],
+  ["Friends", "Rachel", "Ross", "Monica", "Sitcom", "Nova York"],
+  ["The Office", "Escritório", "Michael Scott", "Série", "Comédia", "Papel"],
+  ["Grey's Anatomy", "Hospital", "Médicos", "Meredith", "Cirurgia", "Série"],
+  ["La Casa de Papel", "Assalto", "Professor", "Máscara", "Espanha", "Banco"],
+  ["Wicked", "Musical", "Oz", "Elphaba", "Glinda", "Bruxa"],
+  ["Divertida Mente", "Emoções", "Alegria", "Tristeza", "Riley", "Animação"],
+  ["Jurassic Park", "Dinossauro", "Parque", "Steven Spielberg", "Ilha", "T-Rex"],
+  ["Titanic", "Navio", "Iceberg", "Jack", "Rose", "Naufrágio"],
+  ["Matrix", "Neo", "Pílula", "Realidade", "Código", "Máquinas"],
+  ["Avatar", "Pandora", "Na'vi", "Azul", "James Cameron", "Cinema"],
+  ["Oppenheimer", "Bomba atômica", "Físico", "Christopher Nolan", "Filme", "Cillian Murphy"],
+  ["Ainda Estou Aqui", "Brasil", "Cinema", "Fernanda Torres", "Ditadura", "Família"],
+  ["Super Mario Bros. O Filme", "Mario", "Luigi", "Peach", "Bowser", "Nintendo"],
+  ["Deadpool", "Marvel", "Ryan Reynolds", "Máscara", "Humor", "Wolverine"],
+  ["Pantera Negra", "Wakanda", "Marvel", "T'Challa", "Vibranium", "Herói"],
+  ["Mulher-Maravilha", "Diana", "Amazona", "Laço", "DC", "Braceletes"],
+  ["Coringa", "Batman", "Gotham", "Vilão", "Palhaço", "Sorriso"],
+  ["Superman", "Clark Kent", "Krypton", "Capa", "Lois Lane", "DC"],
+  ["Hello Kitty", "Gatinha", "Laço", "Sanrio", "Japão", "Personagem"],
+  ["Totoro", "Studio Ghibli", "Floresta", "Mei", "Criatura", "Anime"],
+  ["Sailor Moon", "Lua", "Guerreira", "Anime", "Usagi", "Transformação"],
+  ["Peppa Pig", "Porquinha", "George", "Lama", "Desenho", "Família"],
+  ["Pateta", "Disney", "Mickey", "Pluto", "Atrapalhado", "Cachorro"],
+  ["Pernalonga", "Looney Tunes", "Cenoura", "Coelho", "Bugs Bunny", "Desenho"],
+  ["Tom e Jerry", "Gato", "Rato", "Perseguição", "Desenho", "Queijo"],
+  ["Scooby-Doo", "Salsicha", "Cachorro", "Mistério", "Máquina de Mistério", "Fantasma"],
+  ["Pica-Pau", "Pássaro", "Risada", "Desenho", "Topete", "Malandro"],
+  ["Mônica", "Coelho Sansão", "Gibi", "Cebolinha", "Maurício de Sousa", "Dentuça"],
+  ["Cebolinha", "Mônica", "Troca letras", "Gibi", "Cinco fios", "Personagem"],
+  ["Chaves", "México", "Barril", "Seu Madruga", "Vila", "Sanduíche de presunto"],
+  ["Chapolin Colorado", "Herói", "Anteninhas", "Marreta", "Vermelho", "Chespirito"],
+  ["Quico", "Chaves", "Bochechas", "Bola quadrada", "Mãe", "Marinheiro"],
+  ["Edifício", "Apartamento", "Condomínio", "Elevador", "Fachada", "Moradores"],
+  ["Acampamento", "Barraca", "Fogueira", "Natureza", "Dormir", "Trilha"],
+  ["Piquenique", "Cesta", "Parque", "Toalha", "Lanche", "Grama"],
+  ["Shopping", "Lojas", "Cinema", "Praça de alimentação", "Compras", "Vitrine"],
+  ["Supermercado", "Carrinho", "Compras", "Corredor", "Caixa", "Alimentos"],
+  ["Hospital", "Médico", "Paciente", "Enfermagem", "Emergência", "Consulta"],
+  ["Farmácia", "Remédio", "Receita", "Balconista", "Medicamento", "Saúde"],
+  ["Museu", "Exposição", "Arte", "História", "Obra", "Visita"],
+  ["Aquário", "Peixe", "Água", "Tanque", "Tubarão", "Visita"],
+  ["Zoológico", "Animais", "Jaula", "Visita", "Parque", "Safari"],
+  ["Fazenda", "Vaca", "Campo", "Sítio", "Plantação", "Celeiro"],
+  ["Padaria", "Pão", "Café", "Balcão", "Fornada", "Sonho"],
+  ["Restaurante", "Cardápio", "Garçom", "Mesa", "Prato", "Conta"],
+  ["Academia", "Treino", "Peso", "Exercício", "Esteira", "Musculação"],
+  ["Estádio", "Torcida", "Arquibancada", "Jogo", "Gramado", "Ingresso"],
+  ["Universidade", "Faculdade", "Aluno", "Professor", "Curso", "Campus"],
+  ["Delegacia", "Polícia", "Boletim", "Investigação", "Prisão", "Ocorrência"],
+  ["Correio", "Carta", "Selo", "Encomenda", "Caixa postal", "Entrega"],
+  ["Salão de beleza", "Cabelo", "Manicure", "Escova", "Corte", "Salão"],
+  ["Oficina mecânica", "Carro", "Motor", "Conserto", "Mecânico", "Ferramenta"],
+  ["Posto de gasolina", "Combustível", "Carro", "Bomba", "Frentista", "Tanque"],
+  ["Praça", "Banco", "Árvore", "Parque", "Fonte", "Passeio"],
+  ["Metrô", "Estação", "Trem", "Catraca", "Plataforma", "Subterrâneo"]
+];
+/*CARTAS-FIM*/
+
+/* ============ ESTADO ============ */
+const COLORS = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a855f7","#ec4899","#14b8a6","#f97316"];
+const TIMES = [30,45,60,90,120];
+const ROUNDS = [3,5,8,10,0]; // 0 = infinito
+const KEY = "quaseFalei.v1";
+const $ = s => document.querySelector(s);
+
+let cfg = {
+  teams:[{name:"Time Azul",color:COLORS[0],players:""},{name:"Time Vermelho",color:COLORS[1],players:""}],
+  time:60, rounds:5
+};
+let S = null;      // sessão em andamento
+let tick = null;
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY)||"null");
+    if(d){ if(d.cfg) cfg = d.cfg; if(d.S && !d.S.over) S = d.S; }
+  }catch(e){}
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({cfg,S})); }catch(e){} }
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; }
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id));
+  document.documentElement.classList.toggle("lock", id==="play");
+  scrollTo(0,0);
+}
+function other(t){ return 1-t; }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.style.opacity=1; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0,1600); }
+function vib(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ============ CONFIGURAÇÃO ============ */
+function renderSetup(){
+  $("#deckInfo").textContent = CARDS.length + " cartas no baralho";
+  [0,1].forEach(i=>{
+    const t = cfg.teams[i];
+    const box = $("#teamBox"+i);
+    box.innerHTML = `
+      <label>Time ${i+1}</label>
+      <input id="tn${i}" maxlength="20" value="${esc(t.name)}">
+      <div class="swatches">${COLORS.map(c=>`<div class="sw ${c===t.color?"sel":""}" data-c="${c}" style="background:${c}"></div>`).join("")}</div>
+      <label>Jogadores (opcional, um por linha; quem explica gira a cada rodada)</label>
+      <textarea id="tp${i}" rows="2" placeholder="Ana&#10;Bruno">${esc(t.players)}</textarea>`;
+    box.querySelector("#tn"+i).oninput = e=>{ t.name=e.target.value; save(); };
+    box.querySelector("#tp"+i).oninput = e=>{ t.players=e.target.value; save(); };
+    box.querySelectorAll(".sw").forEach(sw=>sw.onclick=()=>{
+      if(sw.dataset.c===cfg.teams[1-i].color){ toast("Cor já usada pelo outro time"); return; }
+      t.color=sw.dataset.c; save(); renderSetup();
+    });
+  });
+  $("#timeChips").innerHTML = TIMES.map(s=>`<div class="chip ${s===cfg.time?"sel":""}" data-v="${s}">${s<60?s+"s":(s/60)+" min"}</div>`).join("");
+  $("#timeChips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{cfg.time=+c.dataset.v;save();renderSetup();});
+  $("#roundChips").innerHTML = ROUNDS.map(r=>`<div class="chip ${r===cfg.rounds?"sel":""}" data-v="${r}">${r||"∞"}</div>`).join("");
+  $("#roundChips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{cfg.rounds=+c.dataset.v;save();renderSetup();});
+  $("#resumeBox").style.display = S ? "flex" : "none";
+}
+
+function startSession(){
+  const teams = cfg.teams.map((t,i)=>({
+    name:(t.name||"").trim()||("Time "+(i+1)), color:t.color, score:0, played:0, pIdx:0,
+    players:t.players.split("\n").map(s=>s.trim()).filter(Boolean)
+  }));
+  S = { teams, time:cfg.time, rounds:cfg.rounds, turn:0, roundNo:0,
+        deck:shuffle(CARDS.map((_,i)=>i)), used:0, round:null, over:false };
+  save(); goReady();
+}
+
+/* ============ PLACAR ============ */
+function scoreHTML(){
+  return S.teams.map((t,i)=>`<div class="t ${i===S.turn?"turn":""}" style="--c:${t.color}">
+    <div class="n">${esc(t.name)}</div><div class="p">${t.score}</div></div>`).join("");
+}
+
+/* ============ VEZ DO TIME ============ */
+function goReady(){
+  const t = S.teams[S.turn];
+  $("#scoreR").innerHTML = scoreHTML();
+  $("#readyTeam").textContent = t.name;
+  $("#readyTeam").style.color = t.color;
+  $("#readyRound").textContent = `Rodada ${t.played+1}${S.rounds?" de "+S.rounds:""} · ${S.deck.length} cartas restantes`;
+  $("#readyPlayer").textContent = t.players.length ? "Explica: "+t.players[t.pIdx % t.players.length] : "";
+  show("ready");
+}
+
+/* ============ RODADA ============ */
+let wakeLock = null;
+async function keepAwake(on){
+  try{
+    if(on && "wakeLock" in navigator){ wakeLock = await navigator.wakeLock.request("screen"); }
+    else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; }
+  }catch(e){}
+}
+
+function startRound(){
+  S.round = { team:S.turn, remaining:S.time*1000, endAt:0, skipUsed:false, log:[], card:null };
+  drawCard();
+  resumeRound();
+}
+function resumeRound(){
+  const r = S.round;
+  r.endAt = Date.now() + r.remaining;
+  save(); show("play"); renderPlay(); keepAwake(true);
+  clearInterval(tick); tick = setInterval(onTick, 200); onTick();
+}
+function pauseRound(){
+  const r = S.round;
+  r.remaining = Math.max(0, r.endAt - Date.now());
+  clearInterval(tick); save(); keepAwake(false); show("paused");
+}
+function onTick(){
+  const r = S.round; if(!r) return;
+  const ms = Math.max(0, r.endAt - Date.now());
+  r.remaining = ms;
+  const s = Math.ceil(ms/1000);
+  const el = $("#timer");
+  el.textContent = Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+  el.classList.toggle("low", s<=10);
+  if(ms<=0) endRound(true);
+}
+
+function drawCard(){
+  const r = S.round;
+  r.card = S.deck.length ? S.deck.shift() : null;
+}
+
+function renderPlay(){
+  const r = S.round, t = S.teams[r.team];
+  $("#scoreP").innerHTML = scoreHTML();
+  $("#skipInfo").textContent = r.skipUsed ? "Pulo já usado nesta rodada" : "1 pulo disponível";
+  document.querySelector('.hints [data-act="skip"]').disabled = r.skipUsed;
+  $("#undoBtn").disabled = !r.log.length;
+  const stage = $("#stage"); stage.innerHTML = "";
+  if(r.card===null){ stage.innerHTML = `<div class="center muted">Acabaram as cartas!</div>`; return; }
+  const c = CARDS[r.card];
+  const el = document.createElement("div");
+  el.className = "card"; el.style.setProperty("--tc", t.color);
+  el.innerHTML = `<div class="head"><small>${esc(t.name)}</small><div class="title">${esc(c[0])}</div></div>
+    <ul>${c.slice(1).map(w=>`<li>${esc(w)}</li>`).join("")}</ul>
+    <div class="stamp ok">ACERTO</div><div class="stamp bad">FALTA</div><div class="stamp sk">PULAR</div>`;
+  stage.appendChild(el);
+  bindSwipe(el);
+}
+
+function flash(color){
+  const f=$("#flash"); f.style.background=color; f.style.transition="none"; f.style.opacity=.35;
+  requestAnimationFrame(()=>{ f.style.transition="opacity .35s"; f.style.opacity=0; });
+}
+
+/* ação: hit (acerto), foul (falta), skip (pulo) */
+function act(kind){
+  const r = S.round; if(!r || r.card===null) return false;
+  if(kind==="skip" && r.skipUsed){ vib([40,40,40]); toast("Só 1 pulo por rodada"); return false; }
+  const card = r.card, scorer = kind==="hit" ? r.team : kind==="foul" ? other(r.team) : null;
+  let pos = null;
+  if(kind==="skip"){
+    r.skipUsed = true;
+    // volta ao baralho em posição aleatória, nunca no topo (se houver outras)
+    pos = S.deck.length ? 1 + (Math.random()*S.deck.length|0) : 0;
+    S.deck.splice(pos,0,card);
+  }else{
+    S.teams[scorer].score++; S.used++;
+  }
+  r.log.push({card,kind,scorer,pos});
+  flash(kind==="hit"?"var(--ok)":kind==="foul"?"var(--bad)":"#888");
+  vib(kind==="hit"?30:kind==="foul"?[60,40,60]:15);
+  drawCard(); save();
+  return true;
+}
+
+function undo(){
+  const r = S.round; const last = r.log.pop(); if(!last) return;
+  if(r.card!==null) S.deck.unshift(r.card);
+  if(last.kind==="skip"){ S.deck.splice(S.deck.indexOf(last.card),1); r.skipUsed=false; }
+  else { S.teams[last.scorer].score--; S.used--; }
+  r.card = last.card; save(); renderPlay(); toast("Desfeito");
+}
+
+/* ============ GESTOS ============ */
+function bindSwipe(el){
+  let sx=0, sy=0, dx=0, dy=0, drag=false;
+  const TH = 90;
+  const stamps = {ok:el.querySelector(".stamp.ok"),bad:el.querySelector(".stamp.bad"),sk:el.querySelector(".stamp.sk")};
+  const dirOf = ()=> Math.abs(dx)>Math.abs(dy) ? (dx>0?"hit":"foul") : "skip";
+  el.addEventListener("pointerdown", e=>{ drag=true; sx=e.clientX; sy=e.clientY; dx=dy=0; el.setPointerCapture(e.pointerId); el.style.transition="none"; });
+  el.addEventListener("pointermove", e=>{
+    if(!drag) return;
+    dx=e.clientX-sx; dy=e.clientY-sy;
+    el.style.transform=`translate(${dx}px,${dy}px) rotate(${dx/18}deg)`;
+    const d = Math.hypot(dx,dy), k = Math.min(1,d/TH), dir = dirOf();
+    stamps.ok.style.opacity = dir==="hit"?k:0;
+    stamps.bad.style.opacity = dir==="foul"?k:0;
+    stamps.sk.style.opacity = dir==="skip"?k:0;
+  });
+  const end = ()=>{
+    if(!drag) return; drag=false;
+    const dir = dirOf(), far = Math.abs(dx)>TH || Math.abs(dy)>TH;
+    if(far && act(dir)){
+      el.style.transition="transform .25s ease-in, opacity .25s";
+      const fx = dir==="skip"?0:Math.sign(dx)*innerWidth*1.2, fy = dir==="skip"?Math.sign(dy||1)*innerHeight:dy;
+      el.style.transform=`translate(${fx}px,${fy}px) rotate(${dx/8}deg)`; el.style.opacity=0;
+      setTimeout(renderPlay,180);
+    }else{
+      el.style.transition="transform .2s"; el.style.transform="";
+      Object.values(stamps).forEach(s=>s.style.opacity=0);
+      if(far){ el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }
+    }
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+}
+
+/* ============ FIM DE RODADA ============ */
+function endRound(byTime){
+  clearInterval(tick); keepAwake(false);
+  const r = S.round, t = S.teams[r.team];
+  if(r.card!==null){ S.deck.push(r.card); shuffle(S.deck); r.card=null; } // carta não resolvida volta
+  if(byTime) vib([200,100,200]);
+  t.played++; t.pIdx++;
+  const hits = r.log.filter(x=>x.kind==="hit").length, fouls = r.log.filter(x=>x.kind==="foul").length;
+  $("#reTitle").textContent = (byTime?"Tempo! ":"") + "Fim da rodada de " + t.name;
+  $("#reSummary").textContent = `${hits} acerto(s) · ${fouls} falta(s) · ${S.deck.length} cartas restantes`;
+  $("#reLog").innerHTML = r.log.map(x=>{
+    const lbl = x.kind==="hit"?`<span style="color:var(--ok)">+1 ${esc(S.teams[x.scorer].name)}</span>`
+              : x.kind==="foul"?`<span style="color:var(--bad)">+1 ${esc(S.teams[x.scorer].name)}</span>`
+              : `<span class="muted">pulada</span>`;
+    return `<div><span>${esc(CARDS[x.card][0])}</span>${lbl}</div>`;
+  }).join("") || `<div class="muted">Nenhuma carta jogada</div>`;
+  S.round = null;
+  S.turn = other(S.turn);
+  const done = (S.rounds && S.teams.every(x=>x.played>=S.rounds)) || S.deck.length===0;
+  $("#scoreE").innerHTML = scoreHTML();
+  $("#nextBtn").textContent = done ? "Ver resultado" : "Próxima: " + S.teams[S.turn].name;
+  $("#nextBtn").onclick = done ? finish : goReady;
+  save(); show("roundEnd");
+}
+
+function finish(){
+  if(S.round) { clearInterval(tick); if(S.round.card!==null) S.deck.push(S.round.card); S.round=null; }
+  keepAwake(false);
+  const [a,b] = S.teams;
+  const w = a.score===b.score ? null : (a.score>b.score?a:b);
+  $("#winner").textContent = w ? w.name + " venceu!" : "Empate!";
+  $("#winner").style.color = w ? w.color : "var(--text)";
+  S.turn = -1;
+  $("#scoreF").innerHTML = scoreHTML();
+  $("#finalInfo").textContent = `${S.used} cartas jogadas · ${a.played + b.played} rodadas`;
+  S.over = true; save(); S = null; show("final");
+}
+
+/* confirmação própria: confirm() nativo é bloqueado em webviews/iframes e retorna false sem mostrar nada */
+function ask(msg, yesLabel, onYes){
+  $("#modalMsg").textContent = msg;
+  $("#modalYes").textContent = yesLabel;
+  $("#modalYes").onclick = ()=>{ $("#modal").classList.remove("on"); onYes(); };
+  $("#modalNo").onclick = ()=> $("#modal").classList.remove("on");
+  $("#modal").classList.add("on");
+}
+function confirmEnd(){ ask("Encerrar a sessão e ver o resultado?", "Encerrar", finish); }
+
+/* ============ LIGAÇÕES ============ */
+$("#startBtn").onclick = ()=>{ if(S) ask("Isso descarta a sessão em andamento. Começar uma nova?", "Começar nova", startSession); else startSession(); };
+$("#resumeBtn").onclick = ()=>{ if(S.round) { show("paused"); } else goReady(); };
+$("#goBtn").onclick = startRound;
+$("#pauseBtn").onclick = pauseRound;
+$("#resumePlay").onclick = resumeRound;
+$("#endRoundBtn").onclick = ()=>endRound(false);
+$("#undoBtn").onclick = undo;
+$("#newBtn").onclick = ()=>{ renderSetup(); show("setup"); };
+["#endBtn1","#endBtn2","#endBtn3"].forEach(id=>$(id).onclick=confirmEnd);
+document.querySelectorAll(".hints button").forEach(b=>b.onclick=()=>{ if(act(b.dataset.act)) renderPlay(); });
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden && S && S.round && $("#play").classList.contains("on")) pauseRound(); });
+
+load(); renderSetup(); show("setup");
+</script>
+</body>
+</html>
