@@ -19,7 +19,7 @@ Jogo de adivinhação em equipe para jogar em um celular passado de mão em mão
 - **Pulo:** só 1 por rodada. A carta pulada volta para o baralho.
 - **Tempo esgotado:** a carta que estava na mão volta para o baralho, sem ponto.
 - **Desfazer:** volta a última ação da rodada, para corrigir um arraste errado.
-- Cartas acertadas ou com falta saem do baralho e não voltam na mesma sessão.
+- **Baralho da sessão:** ao começar, o jogo sorteia 200 cartas do acervo completo. Cartas acertadas ou com falta saem do baralho e não voltam na mesma sessão.
 - A sessão termina quando as rodadas acabam, quando o baralho acaba ou quando alguém toca em **Encerrar sessão**.
 
 Se você fechar o jogo no meio, a sessão fica salva no navegador e aparece **Continuar sessão** quando você abrir de novo.
@@ -34,7 +34,10 @@ As cartas ficam na planilha `cartas.xlsx`:
 
 - coluna **A**: título da carta
 - coluna **B**: as 5 palavras proibidas, separadas por vírgula
+- coluna **C**: tema da carta (só para organizar a planilha; o jogo ainda não usa)
 - a primeira linha é o cabeçalho
+
+Para mudar quantas cartas são sorteadas por sessão, altere `SESSION_SIZE` no `index.html`.
 
 Depois de alterar a planilha, rode:
 

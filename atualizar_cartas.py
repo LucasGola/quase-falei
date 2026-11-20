@@ -1,7 +1,8 @@
 """Copia as cartas da planilha para o index.html.
 
 Uso:  python atualizar_cartas.py [planilha.xlsx]
-Planilha: coluna A = título, coluna B = 5 palavras proibidas separadas por vírgula.
+Planilha: coluna A = título, coluna B = 5 palavras proibidas separadas por vírgula,
+coluna C = tema (opcional, ignorado pelo jogo).
 A primeira linha é o cabeçalho. Só usa a biblioteca padrão do Python.
 """
 import json, re, sys, zipfile
