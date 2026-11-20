@@ -5201,7 +5201,6 @@ const COLORS = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a855f7","#ec4899","#14
 const TIMES = [30,45,60,90,120];
 const ROUNDS = [3,5,8,10,0]; // 0 = infinito
 const KEY = "quaseFalei.v1";
-const SESSION_SIZE = 200; // cartas sorteadas do acervo para cada sessão
 const $ = s => document.querySelector(s);
 
 let cfg = {
@@ -5232,9 +5231,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",
 
 /* ============ CONFIGURAÇÃO ============ */
 function renderSetup(){
-  $("#deckInfo").textContent = CARDS.length > SESSION_SIZE
-    ? `${CARDS.length.toLocaleString("pt-BR")} cartas no acervo · ${SESSION_SIZE} sorteadas por sessão`
-    : `${CARDS.length} cartas no baralho`;
+  $("#deckInfo").textContent = `${CARDS.length.toLocaleString("pt-BR")} cartas no baralho`;
   [0,1].forEach(i=>{
     const t = cfg.teams[i];
     const box = $("#teamBox"+i);
@@ -5264,7 +5261,7 @@ function startSession(){
     players:t.players.split("\n").map(s=>s.trim()).filter(Boolean)
   }));
   S = { teams, time:cfg.time, rounds:cfg.rounds, turn:0, roundNo:0,
-        deck:shuffle(CARDS.map((_,i)=>i)).slice(0, SESSION_SIZE), used:0, round:null, over:false };
+        deck:shuffle(CARDS.map((_,i)=>i)), used:0, round:null, over:false };
   save(); goReady();
 }
 
